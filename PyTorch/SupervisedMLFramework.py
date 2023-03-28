@@ -16,25 +16,27 @@ class SupervisedMLFramework:
         self.is_custom_model = is_custom_model
         self.dataset = dataset
 
-    def preprocess(self, preprocessing_function, data=None):
-        if data == None:
-            self.data = preprocessing_function(self.data)
-            return None
-        else:
-            return preprocessing_function(data)
-
-    def postprocess(self, postprocessing_function) ->  None:
-        self.da
-
-    def train(self,  lr, epochs, loss_function, optim, batch_size=32, k=10):
-
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
         #Move model to GPU if available
-        model = self.model.to(device)
+        self.model = model.to(device)
+
+    # def preprocess(self, preprocessing_function, data=None):
+    #     if data == None:
+    #         self.data = preprocessing_function(self.data)
+    #         return None
+    #     else:
+    #         return preprocessing_function(data)
+
+    # def postprocess(self, postprocessing_function) ->  None:
+    #     self.da
+
+    def train(self,  lr, epochs, loss_function, optim, batch_size=32, k=10):
+
+        
 
         loss_fn = loss_function()
-        optimizer = optim(model.parameters(), lr=lr)
+        optimizer = optim(self.model.parameters(), lr=lr)
 
         if self.autotune:
             #Do sklearn gridsearchcv here.  Will need the model to implement the sklearn estimator interface which im not sure about
@@ -68,10 +70,10 @@ class SupervisedMLFramework:
                     train_dataloader = DataLoader(self.dataset, batch_size, sampler=train_sampler)
                     validation_dataloader = DataLoader(self.dataset, batch_size, sampler=validation_sampler)
                         
-                    for epoch in epochs:
+                    for epoch in range(epochs):
 
                         for batch, (X, y) in enumerate(train_dataloader):
-                            prediction = model(X)
+                            prediction = self.model(X)
                             loss = loss_fn(prediction, y)
 
                             #Backprop
@@ -85,15 +87,35 @@ class SupervisedMLFramework:
                     
                         for batch, (X, y) in enumerate(validation_dataloader):
                             with torch.no_grad():
-                                prediction = model(X)
+                                prediction = self.model(X)
                                 loss = loss_fn(prediction, y)
 
                                 if batch % 100 == 0:
                                     loss, current = loss.item(), (batch + 1) * len(X)
-                                    print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
+                                    print(f"validation loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
+
+                                
 
 
     #TODO
-    def test(self):
-        pass
-    
+    def test(self, loss_function, batch_size=32):
+        
+        test_sampler = SequentialSampler(self.test_indices)
+        test_dataloader = DataLoader(self.dataset, batch_size, sampler=test_sampler)
+
+        loss_fn = loss_function()
+
+        testing_loss = 0
+        for batch, (X, y) in enumerate(test_dataloader):
+            prediction = self.model(X)
+            loss = loss_fn(prediction, y)
+
+            testing_loss += loss.item()
+
+
+    def predict(self, sample):
+        
+        if self.post_processing != None:
+            return self.post_processing(self.model(sample))
+        else:
+            return self.model(sample)
